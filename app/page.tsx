@@ -286,7 +286,7 @@ export const middleware = paymentMiddleware(
                       3. Test with Payment Header
                     </h4>
                     <code className="block bg-gray-100 dark:bg-gray-700 p-4 rounded font-mono text-sm">
-                      curl -H "X-PAYMENT: [payment_signature]" http://localhost:3000/api/protected
+                      curl -H &quot;X-PAYMENT: [payment_signature]&quot; http://localhost:3000/api/protected
                     </code>
                   </div>
                 </div>

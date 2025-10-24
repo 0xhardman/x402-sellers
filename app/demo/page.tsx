@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 interface ApiResponse {
   success?: boolean;
-  data?: any;
+  data?: Record<string, unknown>;
   error?: string;
   message?: string;
 }
@@ -64,7 +64,7 @@ export default function DemoPage() {
         try {
           const customHeadersObj = JSON.parse(customHeaders);
           Object.assign(headers, customHeadersObj);
-        } catch (e) {
+        } catch {
           console.error('Invalid custom headers JSON');
         }
       }
@@ -81,7 +81,7 @@ export default function DemoPage() {
 
       if (res.status === 402) {
         // Payment required
-        const errorText = await res.text();
+        await res.text(); // Consume the response body
         setPaymentError({
           status: 402,
           message: 'Payment Required',
@@ -95,10 +95,11 @@ export default function DemoPage() {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
         setResponse(errorData);
       }
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to the API';
       setResponse({
         error: 'Network Error',
-        message: error.message || 'Failed to connect to the API'
+        message: errorMessage
       });
     } finally {
       setLoading(false);
@@ -278,7 +279,7 @@ export default function DemoPage() {
                     <svg className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <p>Click "Test Endpoint" to see the response</p>
+                    <p>Click &quot;Test Endpoint&quot; to see the response</p>
                   </div>
                 </div>
               )}

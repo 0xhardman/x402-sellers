@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Generate complex analytics data
-function generateComplexAnalytics(parameters: any = {}) {
+function generateComplexAnalytics(parameters: Record<string, string> = {}) {
   const {
     depth = 'comprehensive',
     focus = 'general',
@@ -243,17 +243,44 @@ export async function POST(request: NextRequest) {
       timeRange
     });
 
-    // Optionally exclude certain sections based on request
-    if (!includeRecommendations) {
-      delete analyticsData.analysis.recommendations;
+    // Build response data based on request
+    const responseData: {
+      analysis_id: string;
+      analysis_depth: string;
+      focus_area: string;
+      time_range: string;
+      generated_at: string;
+      analysis: {
+        user_behavior: unknown;
+        revenue: unknown;
+        insights: unknown;
+        predictions?: unknown;
+        recommendations?: unknown;
+        custom_metrics?: Array<{ name: string; value: string; trend: string }>;
+      };
+      confidence_score: string;
+      data_quality_score: string;
+      computation_time_ms: number;
+    } = {
+      ...analyticsData,
+      analysis: {
+        user_behavior: analyticsData.analysis.user_behavior,
+        revenue: analyticsData.analysis.revenue,
+        insights: analyticsData.analysis.insights,
+      }
+    };
+
+    // Conditionally include predictions and recommendations
+    if (includePredictions) {
+      responseData.analysis.predictions = analyticsData.analysis.predictions;
     }
-    if (!includePredictions) {
-      delete analyticsData.analysis.predictions;
+    if (includeRecommendations) {
+      responseData.analysis.recommendations = analyticsData.analysis.recommendations;
     }
 
     // Add any custom metrics requested
     if (customMetrics.length > 0) {
-      analyticsData.analysis.custom_metrics = customMetrics.map((metric: string) => ({
+      responseData.analysis.custom_metrics = customMetrics.map((metric: string) => ({
         name: metric,
         value: (Math.random() * 1000).toFixed(2),
         trend: ['up', 'down', 'stable'][Math.floor(Math.random() * 3)]
@@ -262,7 +289,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: analyticsData,
+      data: responseData,
       message: 'Custom analytics generated successfully',
       paid: true,
       service: 'x402-analytics-api',

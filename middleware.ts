@@ -26,12 +26,12 @@ if (process.env.NODE_ENV === 'development') {
 
 // Configure the x402 payment middleware
 export const middleware = paymentMiddleware(
-  WALLET_ADDRESS,
+  WALLET_ADDRESS as `0x${string}`,
   {
     // Demo weather API - low cost endpoint
     '/api/weather': {
       price: `$${WEATHER_PRICE}`,
-      network: NETWORK as any,
+      network: NETWORK as 'base-sepolia' | 'base',
       config: {
         description: 'Get current weather data',
         mimeType: 'application/json',
@@ -51,7 +51,7 @@ export const middleware = paymentMiddleware(
     // Premium data API - medium cost endpoint
     '/api/premium-data': {
       price: `$${PREMIUM_DATA_PRICE}`,
-      network: NETWORK as any,
+      network: NETWORK as 'base-sepolia' | 'base',
       config: {
         description: 'Access premium market data and analytics',
         mimeType: 'application/json',
@@ -70,7 +70,7 @@ export const middleware = paymentMiddleware(
     // Analytics API - higher cost endpoint
     '/api/analytics': {
       price: `$${ANALYTICS_PRICE}`,
-      network: NETWORK as any,
+      network: NETWORK as 'base-sepolia' | 'base',
       config: {
         description: 'Complex data analytics and insights',
         mimeType: 'application/json',
@@ -90,65 +90,7 @@ export const middleware = paymentMiddleware(
   },
   {
     // Use the facilitator URL from environment or default
-    url: FACILITATOR_URL,
-    // Optional: Custom paywall HTML
-    customPaywallHtml: `
-      <html>
-        <head>
-          <title>Payment Required - x402 Demo</title>
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              max-width: 600px;
-              margin: 50px auto;
-              padding: 20px;
-              background: #f5f5f5;
-            }
-            .container {
-              background: white;
-              border-radius: 8px;
-              padding: 30px;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            h1 { color: #333; }
-            .price {
-              font-size: 24px;
-              color: #007bff;
-              margin: 20px 0;
-              font-weight: bold;
-            }
-            .instructions {
-              background: #f8f9fa;
-              border-left: 4px solid #007bff;
-              padding: 15px;
-              margin: 20px 0;
-            }
-            code {
-              background: #f4f4f4;
-              padding: 2px 6px;
-              border-radius: 3px;
-              font-family: monospace;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>🔐 Payment Required</h1>
-            <p>This endpoint requires payment via the x402 protocol.</p>
-            <div class="price">{{price}}</div>
-            <div class="instructions">
-              <h3>How to Pay:</h3>
-              <p>1. Use an x402-compatible client or wallet</p>
-              <p>2. Sign the payment payload</p>
-              <p>3. Include the <code>X-PAYMENT</code> header in your request</p>
-            </div>
-            <p><strong>Network:</strong> Base Sepolia Testnet</p>
-            <p><strong>Resource:</strong> {{resource}}</p>
-            <p><small>Learn more at <a href="https://x402.org">x402.org</a></small></p>
-          </div>
-        </body>
-      </html>
-    `
+    url: FACILITATOR_URL as `${string}://${string}`,
   }
 );
 

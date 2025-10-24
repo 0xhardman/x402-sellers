@@ -3,7 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 // Generate mock market data
 function generateMarketData() {
   const assets = ['BTC', 'ETH', 'SOL', 'MATIC', 'ARB'];
-  const marketData: any = {};
+  const marketData: Record<string, {
+    price: string;
+    change_24h: string;
+    volume_24h: string;
+    market_cap: string;
+    high_24h: string;
+    low_24h: string;
+  }> = {};
 
   assets.forEach(asset => {
     const basePrice = Math.random() * 50000 + 1000;
@@ -71,7 +78,8 @@ function generatePredictions() {
   };
 }
 
-export async function GET(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(_request: NextRequest) {
   // The x402 middleware handles payment verification
   // If this code is reached, payment has been verified
 
@@ -114,14 +122,23 @@ export async function GET(request: NextRequest) {
 // Support POST requests with custom parameters
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}));
+    const body = await request.json().catch(() => ({})) as {
+      assets?: string[];
+      include_predictions?: boolean;
+      include_trends?: boolean;
+    };
 
     // Allow customization of data based on request
-    const assets = body.assets || ['BTC', 'ETH', 'SOL', 'MATIC', 'ARB'];
     const includesPredictions = body.include_predictions !== false;
     const includesTrends = body.include_trends !== false;
 
-    const response: any = {
+    const response: {
+      success: boolean;
+      data: Record<string, unknown>;
+      message: string;
+      paid: boolean;
+      service: string;
+    } = {
       success: true,
       data: {
         market_data: generateMarketData(),
