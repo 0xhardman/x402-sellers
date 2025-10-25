@@ -1,4 +1,5 @@
 import { paymentMiddleware } from 'x402-next';
+import { facilitator } from '@coinbase/x402';
 
 // Configuration from environment variables
 const WALLET_ADDRESS = process.env.NEXT_PUBLIC_WALLET_ADDRESS || "0x0000000000000000000000000000000000000000";
@@ -88,10 +89,11 @@ export const middleware = paymentMiddleware(
       }
     }
   },
-  {
-    // Use the facilitator URL from environment or default
-    url: FACILITATOR_URL as `${string}://${string}`,
-  }
+  // {
+  //   // Use the facilitator URL from environment or default
+  //   url: FACILITATOR_URL as `${string}://${string}`,
+  // }
+  facilitator
 );
 
 // Configure which paths the middleware should run on
