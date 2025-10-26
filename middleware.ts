@@ -92,11 +92,11 @@ export const middleware = paymentMiddleware(
       },
     },
   },
-  {
-    // Use the facilitator URL from environment or default
-    url: FACILITATOR_URL as `${string}://${string}`,
-  }
-  // facilitator
+  // {
+  //   // Use the facilitator URL from environment or default
+  //   url: FACILITATOR_URL as `${string}://${string}`,
+  // }
+  facilitator
 );
 
 // Configure which paths the middleware should run on
