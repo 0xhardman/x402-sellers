@@ -1,5 +1,5 @@
 import { paymentMiddleware } from "x402-next";
-import { facilitator } from "@coinbase/x402";
+import { createFacilitatorConfig } from "@coinbase/x402";
 
 // Configuration from environment variables
 const WALLET_ADDRESS =
@@ -8,6 +8,10 @@ const WALLET_ADDRESS =
 const FACILITATOR_URL =
   process.env.NEXT_PUBLIC_FACILITATOR_URL || "https://x402.org/facilitator";
 const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "base-sepolia";
+
+// CDP API credentials
+const CDP_API_KEY_ID = process.env.CDP_API_KEY_ID;
+const CDP_API_KEY_SECRET = process.env.CDP_API_KEY_SECRET;
 
 // Pricing configuration (in USD)
 const WEATHER_PRICE = process.env.NEXT_PUBLIC_WEATHER_PRICE || "0.001";
@@ -20,6 +24,8 @@ if (process.env.NODE_ENV === "development") {
     wallet: WALLET_ADDRESS,
     facilitator: FACILITATOR_URL,
     network: NETWORK,
+    cdpApiKeyConfigured: !!(CDP_API_KEY_ID && CDP_API_KEY_SECRET),
+    cdpApiKeyId: CDP_API_KEY_ID ? `${CDP_API_KEY_ID.slice(0, 8)}...` : "not set",
     prices: {
       weather: WEATHER_PRICE,
       premiumData: PREMIUM_DATA_PRICE,
@@ -92,11 +98,8 @@ export const middleware = paymentMiddleware(
       },
     },
   },
-  // {
-  //   // Use the facilitator URL from environment or default
-  //   url: FACILITATOR_URL as `${string}://${string}`,
-  // }
-  facilitator
+  // Use Coinbase CDP facilitator with API credentials
+  createFacilitatorConfig(CDP_API_KEY_ID, CDP_API_KEY_SECRET)
 );
 
 // Configure which paths the middleware should run on
