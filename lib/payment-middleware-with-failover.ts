@@ -9,7 +9,7 @@ import { paymentMiddleware } from "x402-next";
 import { createFacilitatorConfig } from "@coinbase/x402";
 import type { FacilitatorConfig as X402FacilitatorConfig } from "x402/types";
 import type { NextRequest } from "next/server";
-import type { FacilitatorConfig } from "../facilitators.config";
+import type { FacilitatorConfig, FacilitatorError } from "./types";
 
 // Default timeout for facilitator requests (5 seconds)
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -25,11 +25,15 @@ interface FacilitatorOption {
 /**
  * Convert facilitator config to x402 facilitator option
  */
-function convertToFacilitatorOption(config: FacilitatorConfig): FacilitatorOption | null {
+function convertToFacilitatorOption(
+  config: FacilitatorConfig
+): FacilitatorOption | null {
   // Handle Coinbase CDP type
   if (config.type === "coinbase-cdp") {
     if (!config.apiKeyId || !config.apiKeySecret) {
-      console.warn(`[Failover Middleware] Skipping ${config.name}: Missing CDP API credentials`);
+      console.warn(
+        `[x402-next-failover] Skipping ${config.name}: Missing CDP API credentials`
+      );
       return null;
     }
     return {
@@ -43,7 +47,7 @@ function convertToFacilitatorOption(config: FacilitatorConfig): FacilitatorOptio
 
   // Handle URL-based facilitators
   if (!config.url) {
-    console.warn(`[Failover Middleware] Skipping ${config.name}: Missing URL`);
+    console.warn(`[x402-next-failover] Skipping ${config.name}: Missing URL`);
     return null;
   }
 
@@ -65,16 +69,50 @@ function convertToFacilitatorOption(config: FacilitatorConfig): FacilitatorOptio
  * @param routes - Route configuration for payment middleware
  * @param facilitatorConfigs - Array of facilitator configurations
  * @returns Middleware function with failover support
+ *
+ * @example
+ * ```typescript
+ * import { createPaymentMiddlewareWithFailover } from "x402-failover";
+ *
+ * const facilitators = [
+ *   {
+ *     id: "x402-rs",
+ *     name: "X402 RS",
+ *     url: "https://facilitator.x402.rs",
+ *     priority: 1,
+ *     timeoutMs: 5000,
+ *   },
+ *   {
+ *     id: "payai",
+ *     name: "PayAI Network",
+ *     url: "https://facilitator.payai.network",
+ *     priority: 2,
+ *   },
+ * ];
+ *
+ * export const middleware = createPaymentMiddlewareWithFailover(
+ *   "0xYourWalletAddress",
+ *   {
+ *     "/api/data": {
+ *       price: "$0.01",
+ *       network: "base",
+ *       config: { ... }
+ *     }
+ *   },
+ *   facilitators
+ * );
+ * ```
  */
 export function createPaymentMiddlewareWithFailover(
   wallet: `0x${string}`,
   routes: Parameters<typeof paymentMiddleware>[1],
   facilitatorConfigs: FacilitatorConfig[]
-) {
+): (request: NextRequest) => Promise<Response> {
   // Convert configs to options and filter out invalid ones
   const facilitators = facilitatorConfigs
     .map(convertToFacilitatorOption)
     .filter((f): f is FacilitatorOption => f !== null);
+
   // Sort facilitators by priority (lower number = higher priority)
   const sortedFacilitators = [...facilitators].sort(
     (a, b) => a.priority - b.priority
@@ -87,14 +125,16 @@ export function createPaymentMiddlewareWithFailover(
   }));
 
   console.log(
-    `[Failover Middleware] Initialized with ${middlewareInstances.length} facilitators:`,
-    middlewareInstances.map((f) => `${f.name} (priority ${f.priority})`).join(", ")
+    `[x402-next-failover] Initialized with ${middlewareInstances.length} facilitators:`,
+    middlewareInstances
+      .map((f) => `${f.name} (priority ${f.priority})`)
+      .join(", ")
   );
 
   // Return wrapped middleware with failover logic
   return async (request: NextRequest) => {
     const startTime = Date.now();
-    const errors: Array<{ facilitator: string; error: string }> = [];
+    const errors: FacilitatorError[] = [];
 
     // Try each facilitator in priority order
     for (let i = 0; i < middlewareInstances.length; i++) {
@@ -102,7 +142,9 @@ export function createPaymentMiddlewareWithFailover(
       const timeout = timeoutMs || DEFAULT_TIMEOUT_MS;
 
       try {
-        console.log(`[Failover Middleware] Trying facilitator: ${name} (timeout: ${timeout}ms)`);
+        console.log(
+          `[x402-next-failover] Trying facilitator: ${name} (timeout: ${timeout}ms)`
+        );
 
         // Create timeout promise
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -124,7 +166,7 @@ export function createPaymentMiddlewareWithFailover(
           errors.push({ facilitator: name, error: errorMsg });
 
           console.warn(
-            `[Failover Middleware] ${name} returned ${response.status}, trying next facilitator...`
+            `[x402-next-failover] ${name} returned ${response.status}, trying next facilitator...`
           );
 
           // If this is not the last facilitator, continue to next
@@ -139,7 +181,7 @@ export function createPaymentMiddlewareWithFailover(
         // Success! Log and return
         const duration = Date.now() - startTime;
         console.log(
-          `[Failover Middleware] ✓ Success with ${name} (${duration}ms)` +
+          `[x402-next-failover] ✓ Success with ${name} (${duration}ms)` +
             (i > 0 ? ` after ${i} failover(s)` : "")
         );
 
@@ -149,10 +191,7 @@ export function createPaymentMiddlewareWithFailover(
           error instanceof Error ? error.message : String(error);
         errors.push({ facilitator: name, error: errorMsg });
 
-        console.error(
-          `[Failover Middleware] ✗ ${name} failed:`,
-          errorMsg
-        );
+        console.error(`[x402-next-failover] ✗ ${name} failed:`, errorMsg);
 
         // If this is the last facilitator, throw the error
         if (i === middlewareInstances.length - 1) {
@@ -161,7 +200,7 @@ export function createPaymentMiddlewareWithFailover(
 
         // Otherwise, continue to next facilitator
         console.log(
-          `[Failover Middleware] Attempting next facilitator (${
+          `[x402-next-failover] Attempting next facilitator (${
             middlewareInstances.length - i - 1
           } remaining)...`
         );
@@ -171,7 +210,7 @@ export function createPaymentMiddlewareWithFailover(
     // This should never be reached, but just in case
     const duration = Date.now() - startTime;
     console.error(
-      `[Failover Middleware] All facilitators failed after ${duration}ms:`,
+      `[x402-next-failover] All facilitators failed after ${duration}ms:`,
       errors
     );
 

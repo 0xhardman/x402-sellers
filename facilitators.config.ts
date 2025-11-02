@@ -7,27 +7,14 @@
  * - For Coinbase CDP: Set type to "coinbase-cdp" and provide apiKeyId/apiKeySecret from env
  */
 
-export interface FacilitatorConfig {
-  id: string;
-  name: string;
-  priority: number;
-  timeoutMs?: number;
-
-  // For URL-based facilitators
-  url?: string;
-
-  // For Coinbase CDP facilitators
-  type?: "coinbase-cdp";
-  apiKeyId?: string;
-  apiKeySecret?: string;
-}
+import type { FacilitatorConfig } from "./lib/types";
 
 export const facilitators: FacilitatorConfig[] = [
   // Primary: X402 RS
   {
     id: "x402-rs",
     name: "X402 RS",
-    url: "https://facilitator.x402.r",
+    url: "https://facilitator.x402.rs",
     priority: 1,
     timeoutMs: 5000,
   },
