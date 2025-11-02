@@ -1,31 +1,32 @@
-import { paymentMiddleware } from "x402-next";
-import { createFacilitatorConfig } from "@coinbase/x402";
+import {
+  createPaymentMiddlewareWithFailover,
+  getFacilitatorsFromEnv,
+} from "./lib/payment-middleware-with-failover";
 
 // Configuration from environment variables
 const WALLET_ADDRESS =
   process.env.NEXT_PUBLIC_WALLET_ADDRESS ||
   "0x0000000000000000000000000000000000000000";
-const FACILITATOR_URL =
-  process.env.NEXT_PUBLIC_FACILITATOR_URL || "https://x402.org/facilitator";
 const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "base-sepolia";
-
-// CDP API credentials
-const CDP_API_KEY_ID = process.env.CDP_API_KEY_ID;
-const CDP_API_KEY_SECRET = process.env.CDP_API_KEY_SECRET;
 
 // Pricing configuration (in USD)
 const WEATHER_PRICE = process.env.NEXT_PUBLIC_WEATHER_PRICE || "0.001";
 const PREMIUM_DATA_PRICE = process.env.NEXT_PUBLIC_PREMIUM_DATA_PRICE || "0.01";
 const ANALYTICS_PRICE = process.env.NEXT_PUBLIC_ANALYTICS_PRICE || "0.05";
 
+// Get facilitators from environment
+const facilitators = getFacilitatorsFromEnv();
+
 // Log configuration on startup (only in development)
 if (process.env.NODE_ENV === "development") {
   console.log("x402 Configuration:", {
     wallet: WALLET_ADDRESS,
-    facilitator: FACILITATOR_URL,
     network: NETWORK,
-    cdpApiKeyConfigured: !!(CDP_API_KEY_ID && CDP_API_KEY_SECRET),
-    cdpApiKeyId: CDP_API_KEY_ID ? `${CDP_API_KEY_ID.slice(0, 8)}...` : "not set",
+    facilitators: facilitators.map(f => ({
+      id: f.id,
+      name: f.name,
+      priority: f.priority,
+    })),
     prices: {
       weather: WEATHER_PRICE,
       premiumData: PREMIUM_DATA_PRICE,
@@ -34,8 +35,8 @@ if (process.env.NODE_ENV === "development") {
   });
 }
 
-// Configure the x402 payment middleware
-export const middleware = paymentMiddleware(
+// Configure the x402 payment middleware with automatic failover
+export const middleware = createPaymentMiddlewareWithFailover(
   WALLET_ADDRESS as `0x${string}`,
   {
     // Demo weather API - low cost endpoint
@@ -98,8 +99,7 @@ export const middleware = paymentMiddleware(
       },
     },
   },
-  // Use Coinbase CDP facilitator with API credentials
-  createFacilitatorConfig(CDP_API_KEY_ID, CDP_API_KEY_SECRET)
+  facilitators  // Automatic failover between all configured facilitators!
 );
 
 // Configure which paths the middleware should run on
