@@ -1,7 +1,5 @@
-import {
-  createPaymentMiddlewareWithFailover,
-  getFacilitatorsFromEnv,
-} from "./lib/payment-middleware-with-failover";
+import { createPaymentMiddlewareWithFailover } from "./lib/payment-middleware-with-failover";
+import { facilitators } from "./facilitators.config";
 
 // Configuration from environment variables
 const WALLET_ADDRESS =
@@ -13,9 +11,6 @@ const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "base-sepolia";
 const WEATHER_PRICE = process.env.NEXT_PUBLIC_WEATHER_PRICE || "0.001";
 const PREMIUM_DATA_PRICE = process.env.NEXT_PUBLIC_PREMIUM_DATA_PRICE || "0.01";
 const ANALYTICS_PRICE = process.env.NEXT_PUBLIC_ANALYTICS_PRICE || "0.05";
-
-// Get facilitators from environment
-const facilitators = getFacilitatorsFromEnv();
 
 // Log configuration on startup (only in development)
 if (process.env.NODE_ENV === "development") {

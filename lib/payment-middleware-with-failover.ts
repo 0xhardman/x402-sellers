@@ -7,33 +7,74 @@
 
 import { paymentMiddleware } from "x402-next";
 import { createFacilitatorConfig } from "@coinbase/x402";
-import type { FacilitatorConfig } from "x402/types";
+import type { FacilitatorConfig as X402FacilitatorConfig } from "x402/types";
 import type { NextRequest } from "next/server";
+import type { FacilitatorConfig } from "../facilitators.config";
+
+// Default timeout for facilitator requests (5 seconds)
+const DEFAULT_TIMEOUT_MS = 5000;
 
 interface FacilitatorOption {
   id: string;
   name: string;
-  config: FacilitatorConfig;
+  config: X402FacilitatorConfig;
   priority: number;
-  timeoutMs?: number;  // Timeout for this specific facilitator
+  timeoutMs?: number;
 }
 
-// Default timeout for facilitator requests (5 seconds)
-const DEFAULT_TIMEOUT_MS = 5000;
+/**
+ * Convert facilitator config to x402 facilitator option
+ */
+function convertToFacilitatorOption(config: FacilitatorConfig): FacilitatorOption | null {
+  // Handle Coinbase CDP type
+  if (config.type === "coinbase-cdp") {
+    if (!config.apiKeyId || !config.apiKeySecret) {
+      console.warn(`[Failover Middleware] Skipping ${config.name}: Missing CDP API credentials`);
+      return null;
+    }
+    return {
+      id: config.id,
+      name: config.name,
+      config: createFacilitatorConfig(config.apiKeyId, config.apiKeySecret),
+      priority: config.priority,
+      timeoutMs: config.timeoutMs,
+    };
+  }
+
+  // Handle URL-based facilitators
+  if (!config.url) {
+    console.warn(`[Failover Middleware] Skipping ${config.name}: Missing URL`);
+    return null;
+  }
+
+  return {
+    id: config.id,
+    name: config.name,
+    config: {
+      url: config.url as `${string}://${string}`,
+    },
+    priority: config.priority,
+    timeoutMs: config.timeoutMs,
+  };
+}
 
 /**
  * Create payment middleware with automatic failover between facilitators
  *
  * @param wallet - Wallet address to receive payments
  * @param routes - Route configuration for payment middleware
- * @param facilitators - Array of facilitator options (sorted by priority)
+ * @param facilitatorConfigs - Array of facilitator configurations
  * @returns Middleware function with failover support
  */
 export function createPaymentMiddlewareWithFailover(
   wallet: `0x${string}`,
   routes: Parameters<typeof paymentMiddleware>[1],
-  facilitators: FacilitatorOption[]
+  facilitatorConfigs: FacilitatorConfig[]
 ) {
+  // Convert configs to options and filter out invalid ones
+  const facilitators = facilitatorConfigs
+    .map(convertToFacilitatorOption)
+    .filter((f): f is FacilitatorOption => f !== null);
   // Sort facilitators by priority (lower number = higher priority)
   const sortedFacilitators = [...facilitators].sort(
     (a, b) => a.priority - b.priority
@@ -51,13 +92,13 @@ export function createPaymentMiddlewareWithFailover(
   );
 
   // Return wrapped middleware with failover logic
-  return async (request: NextRequest, event: any) => {
+  return async (request: NextRequest) => {
     const startTime = Date.now();
     const errors: Array<{ facilitator: string; error: string }> = [];
 
     // Try each facilitator in priority order
     for (let i = 0; i < middlewareInstances.length; i++) {
-      const { id, name, middleware, timeoutMs } = middlewareInstances[i];
+      const { name, middleware, timeoutMs } = middlewareInstances[i];
       const timeout = timeoutMs || DEFAULT_TIMEOUT_MS;
 
       try {
@@ -72,7 +113,7 @@ export function createPaymentMiddlewareWithFailover(
 
         // Race between middleware call and timeout
         const response = await Promise.race([
-          middleware(request, event),
+          middleware(request),
           timeoutPromise,
         ]);
 
@@ -149,80 +190,4 @@ export function createPaymentMiddlewareWithFailover(
       }
     );
   };
-}
-
-/**
- * Helper function to create facilitator options from environment variables
- */
-export function getFacilitatorsFromEnv(): FacilitatorOption[] {
-  const facilitators: FacilitatorOption[] = [];
-
-  // Get global timeout setting (default 5000ms)
-  const defaultTimeout = parseInt(process.env.FACILITATOR_TIMEOUT_MS || "5000");
-
-  // Facilitator 1: x402.rs
-  const facilitator1Url = process.env.FACILITATOR_1_URL || "https://facilitator.x402.rs";
-  const facilitator1Enabled = process.env.FACILITATOR_1_ENABLED !== "false";
-  const facilitator1Timeout = parseInt(process.env.FACILITATOR_1_TIMEOUT_MS || String(defaultTimeout));
-
-  if (facilitator1Enabled) {
-    facilitators.push({
-      id: "x402-rs",
-      name: "X402 RS",
-      config: {
-        url: facilitator1Url as `${string}://${string}`,
-      },
-      priority: 1,
-      timeoutMs: facilitator1Timeout,
-    });
-  }
-
-  // Facilitator 2: payai.network
-  const facilitator2Url = process.env.FACILITATOR_2_URL || "https://facilitator.payai.network";
-  const facilitator2Enabled = process.env.FACILITATOR_2_ENABLED !== "false";
-  const facilitator2Timeout = parseInt(process.env.FACILITATOR_2_TIMEOUT_MS || String(defaultTimeout));
-
-  if (facilitator2Enabled) {
-    facilitators.push({
-      id: "payai-network",
-      name: "PayAI Network",
-      config: {
-        url: facilitator2Url as `${string}://${string}`,
-      },
-      priority: 2,
-      timeoutMs: facilitator2Timeout,
-    });
-  }
-
-  // Facilitator 3: Coinbase CDP (requires API keys)
-  const cdpApiKeyId = process.env.CDP_API_KEY_ID;
-  const cdpApiKeySecret = process.env.CDP_API_KEY_SECRET;
-  const facilitator3Enabled = process.env.FACILITATOR_3_ENABLED !== "false";
-  const facilitator3Timeout = parseInt(process.env.FACILITATOR_3_TIMEOUT_MS || String(defaultTimeout));
-
-  if (facilitator3Enabled && cdpApiKeyId && cdpApiKeySecret) {
-    facilitators.push({
-      id: "coinbase-cdp",
-      name: "Coinbase CDP",
-      config: createFacilitatorConfig(cdpApiKeyId, cdpApiKeySecret),
-      priority: 3,
-      timeoutMs: facilitator3Timeout,
-    });
-  }
-
-  // If no facilitators configured, use default
-  if (facilitators.length === 0) {
-    const defaultUrl = process.env.NEXT_PUBLIC_FACILITATOR_URL || "https://x402.org/facilitator";
-    facilitators.push({
-      id: "default",
-      name: "Default",
-      config: {
-        url: defaultUrl as `${string}://${string}`,
-      },
-      priority: 1,
-      timeoutMs: defaultTimeout,
-    });
-  }
-
-  return facilitators;
 }
